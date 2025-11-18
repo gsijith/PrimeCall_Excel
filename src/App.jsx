@@ -59,40 +59,62 @@ function App() {
     });
   };
 
-// Extract toll-free number from call destination
-const extractTollFreeNumber = (callDestination) => {
-  if (!callDestination) return null;
-  
-  // Convert to string and remove any spaces or special characters
-  const cleanNumber = String(callDestination).replace(/[^0-9]/g, '');
-  
-  // Handle 10-digit numbers (don't remove first character)
-  if (cleanNumber.length === 10) {
-    // Get the first 3 digits (area code)
-    const areaCode = cleanNumber.substring(0, 3);
+  // Extract toll-free number from call destination
+  const extractTollFreeNumber = (callDestination) => {
+    if (!callDestination) return null;
     
-    // Check if it's a toll-free prefix
-    if (TOLL_FREE_PREFIXES.includes(areaCode)) {
-      return cleanNumber; // Return the full 10-digit number
+    // Convert to string and remove any spaces or special characters
+    const cleanNumber = String(callDestination).replace(/[^0-9]/g, '');
+    
+    // Handle 10-digit numbers (don't remove first character)
+    if (cleanNumber.length === 10) {
+      // Get the first 3 digits (area code)
+      const areaCode = cleanNumber.substring(0, 3);
+      
+      // Check if it's a toll-free prefix
+      if (TOLL_FREE_PREFIXES.includes(areaCode)) {
+        return cleanNumber; // Return the full 10-digit number
+      }
     }
-  }
-  
-  // Handle 11-digit numbers (remove first digit, then check)
-  if (cleanNumber.length === 11) {
-    // Remove first digit
-    const withoutFirstDigit = cleanNumber.substring(1);
     
-    // Get the first 3 digits after removal (area code)
-    const areaCode = withoutFirstDigit.substring(0, 3);
-    
-    // Check if it's a toll-free prefix
-    if (TOLL_FREE_PREFIXES.includes(areaCode)) {
-      return withoutFirstDigit; // Return the 10-digit number (without the leading digit)
+    // Handle 11-digit numbers (remove first digit, then check)
+    if (cleanNumber.length === 11) {
+      // Remove first digit
+      const withoutFirstDigit = cleanNumber.substring(1);
+      
+      // Get the first 3 digits after removal (area code)
+      const areaCode = withoutFirstDigit.substring(0, 3);
+      
+      // Check if it's a toll-free prefix
+      if (TOLL_FREE_PREFIXES.includes(areaCode)) {
+        return withoutFirstDigit; // Return the 10-digit number (without the leading digit)
+      }
     }
-  }
-  
-  return null;
-};
+    
+    return null;
+  };
+
+  // Check if a phone number is toll-free
+  const isTollFreeNumber = (phoneNumber) => {
+    if (!phoneNumber) return false;
+    
+    const cleanNumber = String(phoneNumber).replace(/[^0-9]/g, '');
+    
+    // Check 10-digit numbers
+    if (cleanNumber.length === 10) {
+      const areaCode = cleanNumber.substring(0, 3);
+      return TOLL_FREE_PREFIXES.includes(areaCode);
+    }
+    
+    // Check 11-digit numbers
+    if (cleanNumber.length === 11) {
+      const withoutFirstDigit = cleanNumber.substring(1);
+      const areaCode = withoutFirstDigit.substring(0, 3);
+      return TOLL_FREE_PREFIXES.includes(areaCode);
+    }
+    
+    return false;
+  };
 
   // Parse duration to seconds
   const parseDurationToSeconds = (duration) => {
@@ -186,14 +208,43 @@ const extractTollFreeNumber = (callDestination) => {
         }
       });
 
+      setProgress('Processing customer data...');
+
+      // Step 2: Extract ALL toll-free numbers from customer file
+      const allTollFreeCustomers = [];
+      
+      customerData.forEach((row) => {
+        const phoneKey = Object.keys(row).find(key => 
+          key.toLowerCase().includes('phone')
+        );
+        const customerKey = Object.keys(row).find(key => 
+          key.toLowerCase().includes('customer') || key.toLowerCase().includes('name')
+        );
+
+        let phoneNumber = String(row[phoneKey] || '').replace(/[^0-9]/g, '');
+        const customer = row[customerKey];
+
+        // Normalize phone number (remove leading 1 if present)
+        if (phoneNumber.length === 11 && phoneNumber[0] === '1') {
+          phoneNumber = phoneNumber.substring(1);
+        }
+
+        // Check if this is a toll-free number
+        if (isTollFreeNumber(phoneNumber)) {
+          allTollFreeCustomers.push({
+            customer: customer || 'Unknown',
+            phoneNumber: phoneNumber
+          });
+        }
+      });
+
       setProgress('Matching with customer data...');
 
-      // Step 2: Match with customer data
+      // Step 3: Match with customer data for sheets 2 and 3
       const finalData = [];
       let matchedCount = 0;
 
       customerData.forEach((row) => {
-        // Find phone number field (case-insensitive)
         const phoneKey = Object.keys(row).find(key => 
           key.toLowerCase().includes('phone')
         );
@@ -228,18 +279,18 @@ const extractTollFreeNumber = (callDestination) => {
 
       setProgress('Generating Excel file...');
 
-      // Step 3: Create Excel workbook with 3 sheets
+      // Step 4: Create Excel workbook with 3 sheets
       const workbook = XLSX.utils.book_new();
 
-      // Sheet 1: Customer and Phone Number
-      const sheet1Data = finalData.map(row => ({
+      // Sheet 1: ALL Toll-Free Numbers from Customer File
+      const sheet1Data = allTollFreeCustomers.map(row => ({
         'Customer': row.customer,
-        'Phone Number': row.phoneNumber
+        'Toll-Free Phone Number': row.phoneNumber
       }));
       const sheet1 = XLSX.utils.json_to_sheet(sheet1Data);
-      XLSX.utils.book_append_sheet(workbook, sheet1, 'Customer Info');
+      XLSX.utils.book_append_sheet(workbook, sheet1, 'All Toll-Free Numbers');
 
-      // Sheet 2: Total Duration (seconds), Customer, Phone Number
+      // Sheet 2: Total Duration (seconds), Customer, Phone Number (only matched)
       const sheet2Data = finalData.map(row => ({
         'Total Duration (Seconds)': row.durationSeconds,
         'Customer': row.customer,
@@ -292,7 +343,8 @@ const extractTollFreeNumber = (callDestination) => {
         uniqueNumbers: tollFreeCallsMap.size,
         matchedCustomers: matchedCount,
         totalRecords: finalData.length,
-        uniqueCustomers: customerAggregation.size
+        uniqueCustomers: customerAggregation.size,
+        totalTollFreeInCustomerFile: allTollFreeCustomers.length
       });
 
       setProgress('✓ Complete! File downloaded.');
@@ -368,16 +420,16 @@ const extractTollFreeNumber = (callDestination) => {
               <span className="stat-value">{stats.filteredCalls}</span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">Unique Toll-Free Numbers:</span>
+              <span className="stat-label">Unique Toll-Free Numbers in Calls:</span>
               <span className="stat-value">{stats.uniqueNumbers}</span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">Matched Customers:</span>
-              <span className="stat-value">{stats.matchedCustomers}</span>
+              <span className="stat-label">Total Toll-Free Numbers in Customer File:</span>
+              <span className="stat-value">{stats.totalTollFreeInCustomerFile}</span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">Total Records in Report:</span>
-              <span className="stat-value">{stats.totalRecords}</span>
+              <span className="stat-label">Matched Customers (with calls):</span>
+              <span className="stat-value">{stats.matchedCustomers}</span>
             </div>
             <div className="stat-item">
               <span className="stat-label">Unique Customers (Sheet 3):</span>
@@ -396,9 +448,9 @@ const extractTollFreeNumber = (callDestination) => {
           <li>Matches with customer database</li>
           <li>Generates 3-sheet Excel report:
             <ul>
-              <li><strong>Sheet 1:</strong> Customer & Phone Number</li>
-              <li><strong>Sheet 2:</strong> Duration Summary</li>
-              <li><strong>Sheet 3:</strong> Billing Details - <strong>Combined by Customer</strong> (Rate: $0.035/minute)</li>
+              <li><strong>Sheet 1:</strong> All Toll-Free Numbers from Customer File (Customer & Phone Number)</li>
+              <li><strong>Sheet 2:</strong> Duration Summary (Only matched customers with calls)</li>
+              <li><strong>Sheet 3:</strong> Billing Details - Combined by Customer (Rate: $0.035/minute)</li>
             </ul>
           </li>
         </ol>
