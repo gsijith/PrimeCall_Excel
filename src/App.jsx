@@ -248,13 +248,37 @@ const extractTollFreeNumber = (callDestination) => {
       const sheet2 = XLSX.utils.json_to_sheet(sheet2Data);
       XLSX.utils.book_append_sheet(workbook, sheet2, 'Duration Summary');
 
-      // Sheet 3: Customer, Duration (seconds), Duration (minutes), Rate
-      const sheet3Data = finalData.map(row => ({
+      // Sheet 3: Customer, Duration (seconds), Duration (minutes), Rate - COMBINED BY CUSTOMER
+      const customerAggregation = new Map();
+
+      finalData.forEach(row => {
+        const customerName = row.customer;
+        
+        if (customerAggregation.has(customerName)) {
+          const existing = customerAggregation.get(customerName);
+          customerAggregation.set(customerName, {
+            customer: customerName,
+            durationSeconds: existing.durationSeconds + row.durationSeconds,
+            durationMinutes: existing.durationMinutes + row.durationMinutes,
+            rate: existing.rate + row.rate
+          });
+        } else {
+          customerAggregation.set(customerName, {
+            customer: customerName,
+            durationSeconds: row.durationSeconds,
+            durationMinutes: row.durationMinutes,
+            rate: row.rate
+          });
+        }
+      });
+
+      const sheet3Data = Array.from(customerAggregation.values()).map(row => ({
         'Customer': row.customer,
         'Duration (Seconds)': row.durationSeconds,
-        'Duration (Minutes)': row.durationMinutes,
-        'Rate ($)': row.rate
+        'Duration (Minutes)': parseFloat(row.durationMinutes.toFixed(2)),
+        'Rate ($)': parseFloat(row.rate.toFixed(2))
       }));
+
       const sheet3 = XLSX.utils.json_to_sheet(sheet3Data);
       XLSX.utils.book_append_sheet(workbook, sheet3, 'Billing Details');
 
@@ -267,7 +291,8 @@ const extractTollFreeNumber = (callDestination) => {
         filteredCalls,
         uniqueNumbers: tollFreeCallsMap.size,
         matchedCustomers: matchedCount,
-        totalRecords: finalData.length
+        totalRecords: finalData.length,
+        uniqueCustomers: customerAggregation.size
       });
 
       setProgress('✓ Complete! File downloaded.');
@@ -354,6 +379,10 @@ const extractTollFreeNumber = (callDestination) => {
               <span className="stat-label">Total Records in Report:</span>
               <span className="stat-value">{stats.totalRecords}</span>
             </div>
+            <div className="stat-item">
+              <span className="stat-label">Unique Customers (Sheet 3):</span>
+              <span className="stat-value">{stats.uniqueCustomers}</span>
+            </div>
           </div>
         </div>
       )}
@@ -369,7 +398,7 @@ const extractTollFreeNumber = (callDestination) => {
             <ul>
               <li><strong>Sheet 1:</strong> Customer & Phone Number</li>
               <li><strong>Sheet 2:</strong> Duration Summary</li>
-              <li><strong>Sheet 3:</strong> Billing Details (Rate: $0.035/minute)</li>
+              <li><strong>Sheet 3:</strong> Billing Details - <strong>Combined by Customer</strong> (Rate: $0.035/minute)</li>
             </ul>
           </li>
         </ol>
