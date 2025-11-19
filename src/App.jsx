@@ -22,6 +22,20 @@ function App() {
     setStats(null);
   };
 
+  // Clean customer name - remove invalid names like "-"
+  const cleanCustomerName = (name) => {
+    if (!name) return 'Unknown';
+    
+    const trimmedName = String(name).trim();
+    
+    // Check if it's just a dash or empty
+    if (trimmedName === '-' || trimmedName === '' || trimmedName === 'Unknown') {
+      return 'Unknown';
+    }
+    
+    return trimmedName;
+  };
+
   // Read file based on extension
   const readFile = async (file) => {
     return new Promise((resolve, reject) => {
@@ -210,8 +224,9 @@ function App() {
 
       setProgress('Processing customer data...');
 
-      // Step 2: Extract ALL toll-free numbers from customer file
-      const allTollFreeCustomers = [];
+      // Step 2: Extract UNIQUE toll-free numbers from customer file
+      const uniqueTollFreeMap = new Map(); // phoneNumber -> customer
+      let skippedDashNames = 0;
       
       customerData.forEach((row) => {
         const phoneKey = Object.keys(row).find(key => 
@@ -222,7 +237,8 @@ function App() {
         );
 
         let phoneNumber = String(row[phoneKey] || '').replace(/[^0-9]/g, '');
-        const customer = row[customerKey];
+        const rawCustomer = row[customerKey];
+        const customer = cleanCustomerName(rawCustomer);
 
         // Normalize phone number (remove leading 1 if present)
         if (phoneNumber.length === 11 && phoneNumber[0] === '1') {
@@ -231,48 +247,39 @@ function App() {
 
         // Check if this is a toll-free number
         if (isTollFreeNumber(phoneNumber)) {
-          allTollFreeCustomers.push({
-            customer: customer || 'Unknown',
-            phoneNumber: phoneNumber
-          });
+          // Skip if customer name is just "-"
+          if (String(rawCustomer).trim() === '-') {
+            skippedDashNames++;
+            return; // Skip this entry
+          }
+          
+          // Only add if not already in map (keeps first occurrence)
+          if (!uniqueTollFreeMap.has(phoneNumber)) {
+            uniqueTollFreeMap.set(phoneNumber, customer);
+          }
         }
       });
 
       setProgress('Matching with customer data...');
 
-      // Step 3: Match with customer data for sheets 2 and 3
+      // Step 3: Match UNIQUE phone numbers with call data
       const finalData = [];
       let matchedCount = 0;
 
-      customerData.forEach((row) => {
-        const phoneKey = Object.keys(row).find(key => 
-          key.toLowerCase().includes('phone')
-        );
-        const customerKey = Object.keys(row).find(key => 
-          key.toLowerCase().includes('customer') || key.toLowerCase().includes('name')
-        );
-
-        let phoneNumber = String(row[phoneKey] || '').replace(/[^0-9]/g, '');
-        const customer = row[customerKey];
-
-        // Normalize phone number (remove leading 1 if present)
-        if (phoneNumber.length === 11 && phoneNumber[0] === '1') {
-          phoneNumber = phoneNumber.substring(1);
-        }
-
+      uniqueTollFreeMap.forEach((customer, phoneNumber) => {
         // Check if this phone number exists in our toll-free calls
         if (tollFreeCallsMap.has(phoneNumber)) {
           matchedCount++;
           const totalDuration = tollFreeCallsMap.get(phoneNumber);
-          const durationMinutes = (totalDuration / 60).toFixed(2);
-          const rate = (durationMinutes * 0.035).toFixed(2);
+          const durationMinutes = (totalDuration / 60);
+          const rate = (durationMinutes * 0.035);
 
           finalData.push({
-            customer: customer || 'Unknown',
+            customer: customer,
             phoneNumber: phoneNumber,
             durationSeconds: totalDuration,
-            durationMinutes: parseFloat(durationMinutes),
-            rate: parseFloat(rate)
+            durationMinutes: parseFloat(durationMinutes.toFixed(2)),
+            rate: parseFloat(rate.toFixed(2))
           });
         }
       });
@@ -282,10 +289,10 @@ function App() {
       // Step 4: Create Excel workbook with 3 sheets
       const workbook = XLSX.utils.book_new();
 
-      // Sheet 1: ALL Toll-Free Numbers from Customer File
-      const sheet1Data = allTollFreeCustomers.map(row => ({
-        'Customer': row.customer,
-        'Toll-Free Phone Number': row.phoneNumber
+      // Sheet 1: ALL UNIQUE Toll-Free Numbers from Customer File (excluding "-" names)
+      const sheet1Data = Array.from(uniqueTollFreeMap.entries()).map(([phoneNumber, customer]) => ({
+        'Customer': customer,
+        'Toll-Free Phone Number': phoneNumber
       }));
       const sheet1 = XLSX.utils.json_to_sheet(sheet1Data);
       XLSX.utils.book_append_sheet(workbook, sheet1, 'All Toll-Free Numbers');
@@ -344,7 +351,8 @@ function App() {
         matchedCustomers: matchedCount,
         totalRecords: finalData.length,
         uniqueCustomers: customerAggregation.size,
-        totalTollFreeInCustomerFile: allTollFreeCustomers.length
+        totalTollFreeInCustomerFile: uniqueTollFreeMap.size,
+        skippedDashNames: skippedDashNames
       });
 
       setProgress('✓ Complete! File downloaded.');
@@ -424,7 +432,7 @@ function App() {
               <span className="stat-value">{stats.uniqueNumbers}</span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">Total Toll-Free Numbers in Customer File:</span>
+              <span className="stat-label">Unique Toll-Free Numbers in Customer File:</span>
               <span className="stat-value">{stats.totalTollFreeInCustomerFile}</span>
             </div>
             <div className="stat-item">
@@ -432,9 +440,15 @@ function App() {
               <span className="stat-value">{stats.matchedCustomers}</span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">Unique Customers (Sheet 3):</span>
+              <span className="stat-label">Unique Customers in Billing:</span>
               <span className="stat-value">{stats.uniqueCustomers}</span>
             </div>
+            {stats.skippedDashNames > 0 && (
+              <div className="stat-item">
+                <span className="stat-label">Skipped Records (Customer Name = "-"):</span>
+                <span className="stat-value" style={{color: '#f59e0b'}}>{stats.skippedDashNames}</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -444,12 +458,14 @@ function App() {
         <ol>
           <li>Extracts toll-free numbers (800, 811, 822, 833, 844, 855, 866, 877, 888, 899)</li>
           <li>Filters calls with Response code 200</li>
-          <li>Aggregates total duration for duplicate numbers</li>
-          <li>Matches with customer database</li>
+          <li>Aggregates total duration for duplicate numbers in call data</li>
+          <li>Removes duplicate phone numbers from customer file (keeps first occurrence)</li>
+          <li><strong>Skips records where customer name is just "-"</strong></li>
+          <li>Matches unique customer phone numbers with call data</li>
           <li>Generates 3-sheet Excel report:
             <ul>
-              <li><strong>Sheet 1:</strong> All Toll-Free Numbers from Customer File (Customer & Phone Number)</li>
-              <li><strong>Sheet 2:</strong> Duration Summary (Only matched customers with calls)</li>
+              <li><strong>Sheet 1:</strong> All UNIQUE Toll-Free Numbers (excluding "-" names)</li>
+              <li><strong>Sheet 2:</strong> Duration Summary (Only matched customers with correct durations)</li>
               <li><strong>Sheet 3:</strong> Billing Details - Combined by Customer (Rate: $0.035/minute)</li>
             </ul>
           </li>
