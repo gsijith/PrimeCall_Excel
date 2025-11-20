@@ -2,7 +2,8 @@ import { useState } from 'react';
 import TollFreeAnalyzer from './TollFreeAnalyzer';
 import ExcelAmountProcessor from './ExcelAmount';
 import './App.css';
-
+import  tollfree from './assets/tollfree.svg';
+import international from './assets/international.svg';
 function App() {
   const [selectedTool, setSelectedTool] = useState(null);
 
@@ -11,7 +12,7 @@ function App() {
       id: 'toll-free',
       name: 'Toll-Free Call ',
       description: 'Advanced call analytics with automated billing reports and customer matching',
-      icon: '📞',
+      icon: tollfree,
       gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       features: ['Call Duration Analysis', 'Automated Billing', 'Customer Matching']
     },
@@ -19,7 +20,7 @@ function App() {
       id: 'excel-amount',
       name: 'International Minutes',
       description: 'Smart data grouping with automatic interest calculations and export file',
-      icon: '📊',
+      icon: international,
       gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
       features: ['Data Grouping', 'Interest Calculator', 'Auto Export']
     }
@@ -74,7 +75,9 @@ function App() {
               onClick={() => setSelectedTool(tool.id)}
             >
               <div className="tool-card-header" style={{ background: tool.gradient }}>
-                <div className="tool-icon-large">{tool.icon}</div>
+                <div className="tool-icon-large">
+                  <img src={tool.icon} alt={tool.name} />
+                </div>
               </div>
               
               <div className="tool-card-body">

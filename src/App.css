@@ -179,7 +179,7 @@ body {
 }
 
 .tool-card-header {
-  padding: 40px;
+  padding: 30px;
   text-align: center;
   position: relative;
   overflow: hidden;
@@ -202,10 +202,18 @@ body {
 }
 
 .tool-icon-large {
-  font-size: 4rem;
   position: relative;
   z-index: 1;
   filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.3));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-icon-large img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
 }
 
 .tool-card-body {
