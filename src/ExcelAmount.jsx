@@ -223,15 +223,15 @@ function ExcelAmount() {
     const result = Object.values(grouped).map(item => {
       const interestAmount = item.total_amount * 1.30;
       return {
-        ANI: item.ani,
-        'Total Duration': item.duration.toFixed(2),
-        'Total Amount': item.total_amount.toFixed(2),
+        ani: item.ani,
+        'duration': item.duration.toFixed(2),
+        'total_amount': item.total_amount.toFixed(2),
         'Amount with Interest (30%)': interestAmount.toFixed(2),
         'Number of Records': item.count
       };
     });
 
-    return result.sort((a, b) => a.ANI.localeCompare(b.ANI));
+    return result.sort((a, b) => a.ani.localeCompare(b.ani));
   };
 
   const generateExcelFile = (processedData, filterByDate, start, end, filePrefix = 'processed_data') => {
