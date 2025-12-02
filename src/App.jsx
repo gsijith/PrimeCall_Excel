@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import TollFreeAnalyzer from './TollFreeAnalyzer';
 import ExcelAmountProcessor from './ExcelAmount';
+import SMSDataProcessor from './SMSDataProcessor';
 import './App.css';
-import  tollfree from './assets/tollfree.svg';
+import './SMSDataProcessor.css';
+import tollfree from './assets/tollfree.svg';
 import international from './assets/international.svg';
+import sms from './assets/sms.svg'; // Add this SVG or use a placeholder
+
 function App() {
   const [selectedTool, setSelectedTool] = useState(null);
 
   const tools = [
     {
       id: 'toll-free',
-      name: 'Toll-Free Call ',
+      name: 'Toll-Free Call',
       description: 'Advanced call analytics with automated billing reports and customer matching',
       icon: tollfree,
       gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -23,6 +27,14 @@ function App() {
       icon: international,
       gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
       features: ['Data Grouping', 'Interest Calculator', 'Auto Export']
+    },
+    {
+      id: 'sms-processor',
+      name: 'SMS Data Processor',
+      description: 'Filter outbound SMS data with smart deduplication and message counting',
+      icon: sms,
+      gradient: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
+      features: ['Outbound Filtering', 'Number Deduplication', 'Message Count']
     }
   ];
 
@@ -58,9 +70,22 @@ function App() {
     );
   }
 
+  if (selectedTool === 'sms-processor') {
+    return (
+      <div className="app-wrapper">
+        <button className="back-button" onClick={handleBack}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Tools
+        </button>
+        <SMSDataProcessor />
+      </div>
+    );
+  }
+
   return (
     <div className="main-container">
-
       <div className="tools-container">
         <div className="tools-header">
           <h2>Choose Your Tool</h2>

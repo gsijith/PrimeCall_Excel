@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="smsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4"/>
+      <stop offset="100%" style="stop-color:#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="15" width="80" height="60" rx="12" fill="white" opacity="0.9"/>
+  <path d="M10 27C10 20.373 15.373 15 22 15H78C84.627 15 90 20.373 90 27V63C90 69.627 84.627 75 78 75H30L18 85V75H22C15.373 75 10 69.627 10 63V27Z" fill="white" opacity="0.95"/>
+  <circle cx="35" cy="45" r="6" fill="url(#smsGrad)"/>
+  <circle cx="50" cy="45" r="6" fill="url(#smsGrad)"/>
+  <circle cx="65" cy="45" r="6" fill="url(#smsGrad)"/>
+  <path d="M25 30H75" stroke="url(#smsGrad)" stroke-width="3" stroke-linecap="round" opacity="0.3"/>
+  <path d="M25 58H55" stroke="url(#smsGrad)" stroke-width="3" stroke-linecap="round" opacity="0.3"/>
+</svg>
