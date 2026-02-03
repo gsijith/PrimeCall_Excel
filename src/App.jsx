@@ -2,11 +2,13 @@ import { useState } from 'react';
 import TollFreeAnalyzer from './TollFreeAnalyzer';
 import ExcelAmountProcessor from './ExcelAmount';
 import SMSDataProcessor from './SMSDataProcessor';
+import PhoneNumberMatcher from './PhoneNumberMatcher'; // Import the new component
 import './App.css';
 import './SMSDataProcessor.css';
 import tollfree from './assets/tollfree.svg';
 import international from './assets/international.svg';
-import sms from './assets/sms.svg'; // Add this SVG or use a placeholder
+import sms from './assets/sms.svg';
+import local from './assets/call.svg'; // Add a new SVG icon for local calls
 
 function App() {
   const [selectedTool, setSelectedTool] = useState(null);
@@ -35,6 +37,14 @@ function App() {
       icon: sms,
       gradient: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
       features: ['Outbound Filtering', 'Number Deduplication', 'Message Count']
+    },
+    {
+      id: 'local-call',
+      name: 'Local Call Analyzer',
+      description: 'Match all phone numbers between call data and customer files with billing',
+      icon: local,
+      gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+      features: ['All Number Matching', 'Duration Tracking', 'Billing Reports']
     }
   ];
 
@@ -80,6 +90,20 @@ function App() {
           Back to Tools
         </button>
         <SMSDataProcessor />
+      </div>
+    );
+  }
+
+  if (selectedTool === 'local-call') {
+    return (
+      <div className="app-wrapper">
+        <button className="back-button" onClick={handleBack}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Tools
+        </button>
+        <PhoneNumberMatcher />
       </div>
     );
   }
