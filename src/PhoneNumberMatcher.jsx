@@ -20,39 +20,27 @@ function PhoneNumberMatcher() {
     setStats(null);
   };
 
-  // Clean customer name - remove invalid names like "-"
   const cleanCustomerName = (name) => {
     if (!name) return 'Unknown';
-    
     const trimmedName = String(name).trim();
-    
-    // Check if it's just a dash or empty
     if (trimmedName === '-' || trimmedName === '' || trimmedName === 'Unknown') {
       return 'Unknown';
     }
-    
     return trimmedName;
   };
 
-  // Read file based on extension
   const readFile = async (file) => {
     return new Promise((resolve, reject) => {
       const fileExtension = file.name.split('.').pop().toLowerCase();
 
       if (fileExtension === 'csv') {
-        // Parse CSV using PapaParse
         Papa.parse(file, {
           header: true,
           skipEmptyLines: true,
-          complete: (results) => {
-            resolve(results.data);
-          },
-          error: (error) => {
-            reject(error);
-          }
+          complete: (results) => resolve(results.data),
+          error: (error) => reject(error)
         });
       } else {
-        // Parse Excel files (.xlsx, .xls)
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
@@ -71,41 +59,25 @@ function PhoneNumberMatcher() {
     });
   };
 
-  // Normalize phone number
   const normalizePhoneNumber = (phoneNumber) => {
     if (!phoneNumber) return null;
-    
-    // Convert to string and remove any spaces or special characters
     const cleanNumber = String(phoneNumber).replace(/[^0-9]/g, '');
-    
-    // Handle 11-digit numbers (remove leading 1)
     if (cleanNumber.length === 11 && cleanNumber[0] === '1') {
       return cleanNumber.substring(1);
     }
-    
-    // Return 10-digit numbers as is
     if (cleanNumber.length === 10) {
       return cleanNumber;
     }
-    
     return null;
   };
 
-  // Parse duration to seconds
   const parseDurationToSeconds = (duration) => {
     if (!duration) return 0;
-    
-    // Handle if already a number
     if (typeof duration === 'number') return duration;
-    
     const durationStr = String(duration).trim();
-    
-    // If it's already in seconds (just a number)
     if (/^\d+$/.test(durationStr)) {
       return parseInt(durationStr);
     }
-    
-    // Handle HH:MM:SS format
     if (durationStr.includes(':')) {
       const parts = durationStr.split(':');
       if (parts.length === 3) {
@@ -119,7 +91,6 @@ function PhoneNumberMatcher() {
         return (minutes * 60) + seconds;
       }
     }
-    
     return 0;
   };
 
@@ -133,13 +104,12 @@ function PhoneNumberMatcher() {
     setProgress('Reading call data file...');
 
     try {
-      // Read both files
       const callData = await readFile(callDataFile);
       setProgress('Reading customer file...');
       const customerData = await readFile(customerFile);
 
       setProgress('Processing call data...');
-      
+
       // Step 1: Extract all phone numbers from call data with response 200
       const callsMap = new Map();
       let totalCalls = 0;
@@ -147,15 +117,14 @@ function PhoneNumberMatcher() {
 
       callData.forEach((row) => {
         totalCalls++;
-        
-        // Find the correct field names (case-insensitive)
-        const callDestKey = Object.keys(row).find(key => 
+
+        const callDestKey = Object.keys(row).find(key =>
           key.toLowerCase().includes('destination') || key.toLowerCase().includes('called')
         );
-        const responseKey = Object.keys(row).find(key => 
+        const responseKey = Object.keys(row).find(key =>
           key.toLowerCase().includes('response')
         );
-        const durationKey = Object.keys(row).find(key => 
+        const durationKey = Object.keys(row).find(key =>
           key.toLowerCase().includes('duration')
         );
 
@@ -163,20 +132,14 @@ function PhoneNumberMatcher() {
         const response = String(row[responseKey]);
         const duration = row[durationKey];
 
-        // Normalize phone number
         const phoneNumber = normalizePhoneNumber(callDestination);
 
-        // Check if response is 200 and we have a valid phone number
         if (phoneNumber && response === '200') {
           filteredCalls++;
           const durationInSeconds = parseDurationToSeconds(duration);
 
-          // Aggregate durations for same numbers
           if (callsMap.has(phoneNumber)) {
-            callsMap.set(
-              phoneNumber,
-              callsMap.get(phoneNumber) + durationInSeconds
-            );
+            callsMap.set(phoneNumber, callsMap.get(phoneNumber) + durationInSeconds);
           } else {
             callsMap.set(phoneNumber, durationInSeconds);
           }
@@ -186,14 +149,14 @@ function PhoneNumberMatcher() {
       setProgress('Processing customer data...');
 
       // Step 2: Extract UNIQUE phone numbers from customer file
-      const uniqueCustomerMap = new Map(); // phoneNumber -> customer
+      const uniqueCustomerMap = new Map();
       let skippedDashNames = 0;
-      
+
       customerData.forEach((row) => {
-        const phoneKey = Object.keys(row).find(key => 
+        const phoneKey = Object.keys(row).find(key =>
           key.toLowerCase().includes('phone')
         );
-        const customerKey = Object.keys(row).find(key => 
+        const customerKey = Object.keys(row).find(key =>
           key.toLowerCase().includes('customer') || key.toLowerCase().includes('name')
         );
 
@@ -203,13 +166,10 @@ function PhoneNumberMatcher() {
         const customer = cleanCustomerName(rawCustomer);
 
         if (phoneNumber) {
-          // Skip if customer name is just "-"
           if (String(rawCustomer).trim() === '-') {
             skippedDashNames++;
-            return; // Skip this entry
+            return;
           }
-          
-          // Only add if not already in map (keeps first occurrence)
           if (!uniqueCustomerMap.has(phoneNumber)) {
             uniqueCustomerMap.set(phoneNumber, customer);
           }
@@ -223,12 +183,11 @@ function PhoneNumberMatcher() {
       let matchedCount = 0;
 
       uniqueCustomerMap.forEach((customer, phoneNumber) => {
-        // Check if this phone number exists in our calls
         if (callsMap.has(phoneNumber)) {
           matchedCount++;
           const totalDuration = callsMap.get(phoneNumber);
-          const durationMinutes = (totalDuration / 60);
-          const rate = (durationMinutes * 0.035);
+          const durationMinutes = totalDuration / 60;
+          const rate = durationMinutes * 0.035;
 
           finalData.push({
             customer: customer,
@@ -242,7 +201,7 @@ function PhoneNumberMatcher() {
 
       setProgress('Generating Excel file...');
 
-      // Step 4: Create Excel workbook with 3 sheets
+      // Step 4: Create Excel workbook with 4 sheets
       const workbook = XLSX.utils.book_new();
 
       // Sheet 1: ALL UNIQUE Phone Numbers from Customer File (excluding "-" names)
@@ -267,7 +226,7 @@ function PhoneNumberMatcher() {
 
       finalData.forEach(row => {
         const customerName = row.customer;
-        
+
         if (customerAggregation.has(customerName)) {
           const existing = customerAggregation.get(customerName);
           customerAggregation.set(customerName, {
@@ -295,6 +254,38 @@ function PhoneNumberMatcher() {
 
       const sheet3 = XLSX.utils.json_to_sheet(sheet3Data);
       XLSX.utils.book_append_sheet(workbook, sheet3, 'Billing Details');
+
+      // Sheet 4: Skipped Records (Customer Name = "-")
+      const skippedRecords = [];
+      customerData.forEach((row) => {
+        const phoneKey = Object.keys(row).find(key =>
+          key.toLowerCase().includes('phone')
+        );
+        const customerKey = Object.keys(row).find(key =>
+          key.toLowerCase().includes('customer') || key.toLowerCase().includes('name')
+        );
+
+        const rawPhoneNumber = row[phoneKey];
+        const phoneNumber = normalizePhoneNumber(rawPhoneNumber);
+        const rawCustomer = row[customerKey];
+
+        if (phoneNumber && String(rawCustomer).trim() === '-') {
+          const hasCallData = callsMap.has(phoneNumber);
+          const totalDuration = hasCallData ? callsMap.get(phoneNumber) : 0;
+
+          skippedRecords.push({
+            'Phone Number': phoneNumber,
+            'Original Customer Name': rawCustomer,
+            'Had Call Data': hasCallData ? 'Yes' : 'No',
+            'Total Duration (Seconds)': totalDuration,
+            'Total Duration (Minutes)': parseFloat((totalDuration / 60).toFixed(2)),
+            'Rate ($)': parseFloat(((totalDuration / 60) * 0.035).toFixed(2))
+          });
+        }
+      });
+
+      const sheet4 = XLSX.utils.json_to_sheet(skippedRecords);
+      XLSX.utils.book_append_sheet(workbook, sheet4, 'Skipped Records');
 
       // Export the file
       const timestamp = new Date().toISOString().split('T')[0];
@@ -333,9 +324,9 @@ function PhoneNumberMatcher() {
             <strong>📞 Call Data File</strong>
             <span className="file-info">(Duration, Response, Call Destination)</span>
           </label>
-          <input 
-            type="file" 
-            accept=".xlsx,.xls,.csv" 
+          <input
+            type="file"
+            accept=".xlsx,.xls,.csv"
             onChange={(e) => handleFileUpload(e, 'calls')}
             disabled={processing}
           />
@@ -347,9 +338,9 @@ function PhoneNumberMatcher() {
             <strong>👥 Customer Data File</strong>
             <span className="file-info">(Customer, Phone Number)</span>
           </label>
-          <input 
-            type="file" 
-            accept=".xlsx,.xls,.csv" 
+          <input
+            type="file"
+            accept=".xlsx,.xls,.csv"
             onChange={(e) => handleFileUpload(e, 'customers')}
             disabled={processing}
           />
@@ -357,7 +348,7 @@ function PhoneNumberMatcher() {
         </div>
       </div>
 
-      <button 
+      <button
         onClick={processFiles}
         disabled={processing || !callDataFile || !customerFile}
         className="process-button"
@@ -402,7 +393,7 @@ function PhoneNumberMatcher() {
             {stats.skippedDashNames > 0 && (
               <div className="stat-item">
                 <span className="stat-label">Skipped Records (Customer Name = "-"):</span>
-                <span className="stat-value" style={{color: '#f59e0b'}}>{stats.skippedDashNames}</span>
+                <span className="stat-value" style={{ color: '#f59e0b' }}>{stats.skippedDashNames}</span>
               </div>
             )}
           </div>
@@ -418,11 +409,12 @@ function PhoneNumberMatcher() {
           <li>Removes duplicate phone numbers from customer file (keeps first occurrence)</li>
           <li><strong>Skips records where customer name is just "-"</strong></li>
           <li>Matches unique customer phone numbers with call data</li>
-          <li>Generates 3-sheet Excel report:
+          <li>Generates 4-sheet Excel report:
             <ul>
               <li><strong>Sheet 1:</strong> All UNIQUE Phone Numbers (excluding "-" names)</li>
               <li><strong>Sheet 2:</strong> Duration Summary (Only matched customers)</li>
               <li><strong>Sheet 3:</strong> Billing Details - Combined by Customer (Rate: $0.035/minute)</li>
+              <li><strong>Sheet 4:</strong> Skipped Records - Details of records with "-" customer names</li>
             </ul>
           </li>
         </ol>
